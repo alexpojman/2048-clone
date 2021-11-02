@@ -1,4 +1,4 @@
-use bevy::{ecs::query, prelude::*};
+use bevy::prelude::*;
 use itertools::Itertools;
 use rand::prelude::*;
 use std::{cmp::Ordering, convert::TryFrom};
@@ -271,7 +271,6 @@ fn board_shift(
         .find_map(|key_code| BoardShift::try_from(key_code).ok());
 
     if let Some(board_shift) = shift_direction {
-        dbg!("left");
         let mut it = tiles
             .iter_mut()
             .sorted_by(|a, b| board_shift.sort(&a.1, &b.1))
