@@ -3,6 +3,9 @@ use itertools::Itertools;
 use rand::prelude::*;
 use std::{cmp::Ordering, convert::TryFrom};
 
+mod ui;
+use ui::*;
+
 const TILE_SIZE: f32 = 40.0;
 const TILE_SPACER: f32 = 10.0;
 
@@ -22,6 +25,19 @@ struct Materials {
     board: Handle<ColorMaterial>,
     tile_placeholder: Handle<ColorMaterial>,
     tile: Handle<ColorMaterial>,
+    none: Handle<ColorMaterial>,
+}
+
+impl FromWorld for Materials {
+    fn from_world(world: &mut World) -> Self {
+        let mut materials = world.get_resource_mut::<Assets<ColorMaterial>>().unwrap();
+        Materials {
+            board: materials.add(Color::rgb(0.7, 0.7, 0.8).into()),
+            tile_placeholder: materials.add(Color::rgb(0.75, 0.75, 0.9).into()),
+            tile: materials.add(Color::rgb(0.9, 0.9, 0.9).into()),
+            none: materials.add(Color::NONE.into()),
+        }
+    }
 }
 
 struct Points {
@@ -46,17 +62,6 @@ impl FromWorld for FontSpec {
 
         FontSpec {
             family: asset_server.load("fonts/FiraSans-Bold.ttf"),
-        }
-    }
-}
-
-impl FromWorld for Materials {
-    fn from_world(world: &mut World) -> Self {
-        let mut materials = world.get_resource_mut::<Assets<ColorMaterial>>().unwrap();
-        Materials {
-            board: materials.add(Color::rgb(0.7, 0.7, 0.8).into()),
-            tile_placeholder: materials.add(Color::rgb(0.75, 0.75, 0.9).into()),
-            tile: materials.add(Color::rgb(0.9, 0.9, 0.9).into()),
         }
     }
 }
@@ -143,6 +148,7 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
+        .add_plugin(GameUiPlugin)
         .init_resource::<Materials>()
         .init_resource::<FontSpec>()
         .init_resource::<Game>()
@@ -292,7 +298,7 @@ fn board_shift(
                 }
             }
         }
-        dbg!(game.score);
+
         tile_writer.send(NewTileEvent);
     }
 }
