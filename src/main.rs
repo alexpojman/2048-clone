@@ -147,6 +147,12 @@ struct Game {
     score: u32,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+enum RunState {
+    Playing,
+    GameOver,
+}
+
 fn main() {
     App::build()
         .insert_resource(WindowDescriptor {
@@ -159,14 +165,18 @@ fn main() {
         .init_resource::<FontSpec>()
         .init_resource::<Game>()
         .add_event::<NewTileEvent>()
+        .add_state(RunState::Playing)
         .add_startup_system(setup.system())
         .add_startup_system(spawn_board.system())
         .add_startup_system_to_stage(StartupStage::PostStartup, spawn_tiles.system())
-        .add_system(render_tile_points.system())
-        .add_system(board_shift.system())
-        .add_system(render_tiles.system())
-        .add_system(new_tile_handler.system())
-        .add_system(end_game.system())
+        .add_system_set(
+            SystemSet::on_update(RunState::Playing)
+                .with_system(render_tile_points.system())
+                .with_system(board_shift.system())
+                .with_system(render_tiles.system())
+                .with_system(new_tile_handler.system())
+                .with_system(end_game.system()),
+        )
         .run();
 }
 
@@ -388,7 +398,11 @@ fn spawn_tile(
         .insert(pos);
 }
 
-fn end_game(tiles: Query<(&Position, &Points)>, query_board: Query<&Board>) {
+fn end_game(
+    tiles: Query<(&Position, &Points)>,
+    query_board: Query<&Board>,
+    mut run_state: ResMut<State<RunState>>,
+) {
     let board = query_board.single().expect("expect there to be a board");
 
     if tiles.iter().len() == 16 {
@@ -419,6 +433,7 @@ fn end_game(tiles: Query<(&Position, &Points)>, query_board: Query<&Board>) {
 
         if has_move == false {
             dbg!("game over!");
+            run_state.set(RunState::GameOver).unwrap();
         }
     }
 }
