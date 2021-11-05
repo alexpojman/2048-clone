@@ -1,7 +1,12 @@
 use bevy::prelude::*;
 use itertools::Itertools;
 use rand::prelude::*;
-use std::{cmp::Ordering, convert::TryFrom};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    ops::Range,
+};
 
 mod ui;
 use ui::*;
@@ -40,11 +45,12 @@ impl FromWorld for Materials {
     }
 }
 
+#[derive(PartialEq)]
 struct Points {
     value: u32,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
 struct Position {
     x: u8,
     y: u8,
@@ -160,6 +166,7 @@ fn main() {
         .add_system(board_shift.system())
         .add_system(render_tiles.system())
         .add_system(new_tile_handler.system())
+        .add_system(end_game.system())
         .run();
 }
 
@@ -379,4 +386,39 @@ fn spawn_tile(
         })
         .insert(Points { value: 2 })
         .insert(pos);
+}
+
+fn end_game(tiles: Query<(&Position, &Points)>, query_board: Query<&Board>) {
+    let board = query_board.single().expect("expect there to be a board");
+
+    if tiles.iter().len() == 16 {
+        let map: HashMap<&Position, &Points> = tiles.iter().collect();
+
+        let neighbor_points = [(-1, 0), (0, 1), (1, 0), (0, -1)];
+
+        let board_range: Range<i8> = 0..(board.size as i8);
+
+        let has_move = tiles.iter().any(|(Position { x, y }, value)| {
+            neighbor_points
+                .iter()
+                .filter_map(|(x2, y2)| {
+                    let new_x = *x as i8 - x2;
+                    let new_y = *y as i8 - y2;
+
+                    if !board_range.contains(&new_x) || !board_range.contains(&new_y) {
+                        return None;
+                    }
+
+                    map.get(&Position {
+                        x: new_x.try_into().unwrap(),
+                        y: new_y.try_into().unwrap(),
+                    })
+                })
+                .any(|&v| v == value)
+        });
+
+        if has_move == false {
+            dbg!("game over!");
+        }
+    }
 }
