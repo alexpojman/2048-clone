@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_easings::{Ease, EaseFunction, EasingType, EasingsPlugin};
 use itertools::Itertools;
 use rand::prelude::*;
 use std::{
@@ -145,6 +146,7 @@ struct NewTileEvent;
 #[derive(Default)]
 struct Game {
     score: u32,
+    score_best: u32,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -161,6 +163,7 @@ fn main() {
         })
         .add_plugins(DefaultPlugins)
         .add_plugin(GameUiPlugin)
+        .add_plugin(EasingsPlugin)
         .init_resource::<Materials>()
         .init_resource::<FontSpec>()
         .init_resource::<Game>()
@@ -168,7 +171,6 @@ fn main() {
         .add_state(RunState::Playing)
         .add_startup_system(setup.system())
         .add_startup_system(spawn_board.system())
-        .add_startup_system_to_stage(StartupStage::PostStartup, spawn_tiles.system())
         .add_system_set(
             SystemSet::on_update(RunState::Playing)
                 .with_system(render_tile_points.system())
@@ -176,6 +178,11 @@ fn main() {
                 .with_system(render_tiles.system())
                 .with_system(new_tile_handler.system())
                 .with_system(end_game.system()),
+        )
+        .add_system_set(
+            SystemSet::on_enter(RunState::Playing)
+                .with_system(game_reset.system())
+                .with_system(spawn_tiles.system()),
         )
         .run();
 }
@@ -247,15 +254,22 @@ fn render_tile_points(
 }
 
 fn render_tiles(
-    mut tiles: Query<(&mut Transform, &Position, Changed<Position>)>,
+    mut commands: Commands,
+    mut tiles: Query<(Entity, &Transform, &Position), Changed<Position>>,
     query_board: Query<&Board>,
 ) {
     let board = query_board.single().expect("expect there to be a board");
-    for (mut transform, pos, pos_changed) in tiles.iter_mut() {
-        if pos_changed {
-            transform.translation.x = board.cell_position_to_physical(pos.x);
-            transform.translation.y = board.cell_position_to_physical(pos.y);
-        }
+    for (entity, transform, pos) in tiles.iter_mut() {
+        let x = board.cell_position_to_physical(pos.x);
+        let y = board.cell_position_to_physical(pos.y);
+
+        commands.entity(entity).insert(transform.ease_to(
+            Transform::from_xyz(x, y, transform.translation.z),
+            EaseFunction::QuadraticInOut,
+            EasingType::Once {
+                duration: std::time::Duration::from_millis(100),
+            },
+        ));
     }
 }
 
@@ -317,6 +331,10 @@ fn board_shift(
         }
 
         tile_writer.send(NewTileEvent);
+    }
+
+    if game.score_best < game.score {
+        game.score_best = game.score
     }
 }
 
@@ -436,4 +454,15 @@ fn end_game(
             run_state.set(RunState::GameOver).unwrap();
         }
     }
+}
+
+fn game_reset(
+    mut commands: Commands,
+    tiles: Query<Entity, With<Position>>,
+    mut game: ResMut<Game>,
+) {
+    for entity in tiles.iter() {
+        commands.entity(entity).despawn_recursive(); // Remove current entity and all children (e.g. text components)
+    }
+    game.score = 0;
 }

@@ -200,9 +200,18 @@ fn setup_ui(mut commands: Commands, materials: Res<Materials>, font_spec: Res<Fo
         });
 }
 
-fn scoreboard(game: Res<Game>, mut query_scores: Query<&mut Text, With<ScoreDisplay>>) {
-    let mut text = query_scores.single_mut().unwrap();
+fn scoreboard(
+    game: Res<Game>,
+    mut query_scores: QuerySet<(
+        Query<&mut Text, With<ScoreDisplay>>,
+        Query<&mut Text, With<BestScoreDisplay>>,
+    )>,
+) {
+    let mut text = query_scores.q0_mut().single_mut().unwrap();
     text.sections[0].value = game.score.to_string();
+
+    let mut text = query_scores.q1_mut().single_mut().unwrap();
+    text.sections[0].value = game.score_best.to_string();
 }
 
 fn button_interaction_system(
